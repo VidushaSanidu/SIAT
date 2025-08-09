@@ -81,27 +81,34 @@ def create_sliding_windows(trajectories, obs_len=8, pred_len=12, min_agents=2):
     ped_ids = list(trajectories.keys())
     ped_trajs = [trajectories[pid] for pid in ped_ids]
     
-    # Find common time range where we have enough data
-    min_traj_len = min(len(traj) for traj in ped_trajs)
+    # Filter trajectories that are long enough
+    valid_trajs = [(pid, traj) for pid, traj in zip(ped_ids, ped_trajs) if len(traj) >= total_len]
     
-    if min_traj_len < total_len:
-        print(f"     ⚠️  Trajectories too short ({min_traj_len} < {total_len})")
+    if len(valid_trajs) < min_agents:
+        long_enough = len(valid_trajs)
+        print(f"     ⚠️  Only {long_enough} trajectories are long enough (>= {total_len}), need at least {min_agents}")
         return samples
     
-    print(f"     - Creating sliding windows (obs={obs_len}, pred={pred_len})")
+    # Find the maximum common time range
+    max_frames = max(len(traj) for _, traj in valid_trajs)
+    valid_ped_ids, valid_ped_trajs = zip(*valid_trajs)
     
-    # Create sliding windows
-    for start_frame in range(min_traj_len - total_len + 1):
+    
+    print(f"     - Creating sliding windows (obs={obs_len}, pred={pred_len})")
+    print(f"     - Working with {len(valid_trajs)} valid trajectories")
+    
+    # Create sliding windows for each possible time range
+    for start_frame in range(max_frames - total_len + 1):
         end_frame = start_frame + total_len
         
-        # Extract window for all agents
+        # Find agents that have data for this time window
         window_data = []
         valid_agents = []
         
-        for i, traj in enumerate(ped_trajs):
+        for i, (pid, traj) in enumerate(valid_trajs):
             if len(traj) >= end_frame:
                 window_data.append(traj[start_frame:end_frame])
-                valid_agents.append(ped_ids[i])
+                valid_agents.append(pid)
         
         if len(window_data) < min_agents:
             continue
