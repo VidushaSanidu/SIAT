@@ -1,0 +1,5 @@
+# Python dependencies for SIAT project
+numpy
+torch
+torchvision
+torchaudio
