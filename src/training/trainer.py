@@ -36,9 +36,10 @@ def train_one_epoch(model: nn.Module,
         obs = batch['obs'].to(device)               # (B, obs_len, 2)
         fut = batch['fut'].to(device)               # (B, pred_len, 2)
         window = batch['window'].to(device)         # (B, N, obs+pred, 2)
+        agent_mask = batch['agent_mask'].to(device) # (B, N)
 
         optimizer.zero_grad()
-        pred = model(obs, window)
+        pred = model(obs, window, agent_mask)
         loss = F.mse_loss(pred, fut)
         loss.backward()
         
@@ -74,7 +75,9 @@ def evaluate(model: nn.Module,
             obs = batch['obs'].to(device)
             fut = batch['fut'].to(device)
             window = batch['window'].to(device)
-            pred = model(obs, window)
+            agent_mask = batch['agent_mask'].to(device)
+            
+            pred = model(obs, window, agent_mask)
             ade, fde = ade_fde(pred, fut)
             total_ade += ade * obs.size(0)
             total_fde += fde * obs.size(0)

@@ -1,5 +1,6 @@
 # Python dependencies for SIAT project
 numpy
+pandas
 torch
 torchvision
 torchaudio

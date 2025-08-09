@@ -79,11 +79,16 @@ def main():
         obs_len=config.data.obs_len, 
         pred_len=config.data.pred_len
     )
+    
+    # Import collate function
+    from src.data.dataset import collate_fn
+    
     loader = DataLoader(
         dataset, 
         batch_size=config.training.batch_size, 
         shuffle=True, 
-        drop_last=False
+        drop_last=False,
+        collate_fn=collate_fn
     )
     
     print(f"Dataset size: {len(dataset)} samples")

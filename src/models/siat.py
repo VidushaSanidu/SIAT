@@ -132,13 +132,14 @@ class SIAT(nn.Module):
         A_norm = A * D_inv_sqrt
         return A_norm
 
-    def forward(self, obs: torch.Tensor, full_window: torch.Tensor) -> torch.Tensor:
+    def forward(self, obs: torch.Tensor, full_window: torch.Tensor, agent_mask: torch.Tensor = None) -> torch.Tensor:
         """
         Forward pass of SIAT model.
         
         Args:
             obs: Target pedestrian observation of shape (B, obs_len, 2)
             full_window: All agents positions in window of shape (B, N_agents, obs_len+pred_len, 2)
+            agent_mask: Boolean mask indicating valid agents of shape (B, N_agents)
 
         Returns:
             Predicted future trajectory for the target of shape (B, pred_len, 2)
@@ -147,7 +148,6 @@ class SIAT(nn.Module):
         device = obs.device
 
         # Prepare per-agent embeddings: flatten each agent's (obs+pred) window
-        # For agents other than target, we do not know future; we use zeros or replicate obs part
         N = full_window.size(1)
         seq_len = full_window.size(2)
 
@@ -155,42 +155,71 @@ class SIAT(nn.Module):
         agent_flat = full_window.view(B, N, -1)  # (B, N, seq_len*2)
         agent_emb = self.embedding(agent_flat)  # (B, N, embed)
 
+        # Apply agent mask if provided
+        if agent_mask is not None:
+            # Zero out embeddings for invalid agents
+            agent_emb = agent_emb * agent_mask.unsqueeze(-1).float()
+
         # Transformer encoder: process sequence of agent embeddings
-        # TransformerEncoder expects (S, B, E) or (L, N, E) depending - easier to treat agents as sequence
-        # We'll pass agents as the 'sequence' dimension (N, B, E)
+        # TransformerEncoder expects (S, B, E) format
         agent_emb_t = agent_emb.permute(1, 0, 2)  # (N, B, E)
-        trans_enc_out = self.transformer_encoder(agent_emb_t)  # (N, B, E)
+        
+        # Create attention mask for transformer if we have agent_mask
+        if agent_mask is not None:
+            # Transformer mask: True means ignore, False means attend
+            src_key_padding_mask = ~agent_mask  # (B, N)
+        else:
+            src_key_padding_mask = None
+            
+        trans_enc_out = self.transformer_encoder(
+            agent_emb_t, 
+            src_key_padding_mask=src_key_padding_mask
+        )  # (N, B, E)
         trans_enc_out = trans_enc_out.permute(1, 0, 2)  # (B, N, E)
 
-        # GCN: compute adjacency per sample using the last observed positions (take last obs step for each agent)
+        # GCN: compute adjacency per sample using the last observed positions
         last_pos = full_window[:, :, self.obs_len - 1, :]  # (B, N, 2)
         A_norm = self.compute_adjacency(last_pos)  # (B, N, N)
+        
+        # Apply agent mask to adjacency matrix if provided
+        if agent_mask is not None:
+            mask_matrix = agent_mask.unsqueeze(-1) & agent_mask.unsqueeze(-2)  # (B, N, N)
+            A_norm = A_norm * mask_matrix.float()
 
-        # initial node features for GCN: can use transformer features or raw coords
+        # Initial node features for GCN
         H = agent_emb  # (B, N, E)
         for layer in self.gcn:
             H = layer(H, A_norm)  # (B, N, gcn_hidden)
 
-        # project and fuse features
+        # Project and fuse features
         H_trans_proj = self.fuse_trans(trans_enc_out)  # (B, N, embed)
         H_gcn_proj = self.fuse_gcn(H)  # (B, N, embed)
 
         H_fused = self.lambda1 * H_trans_proj + self.lambda2 * H_gcn_proj  # (B, N, embed)
 
         # For decoding, we want the target pedestrian's fused feature
-        # assume the target pedestrian is at index 0 of full_window (dataset should ensure this)
-        target_feat = H_fused[:, 0, :].unsqueeze(0)  # (1, B, E) for transformer decoder memory/query format
+        # Target pedestrian is guaranteed to be at index 0 after preprocessing
+        target_feat = H_fused[:, 0, :].unsqueeze(0)  # (1, B, E)
 
-        # Create a decoder target query — we can use positional tokens equal to pred_len steps.
-        # Simpler: repeat a learnable query vector pred_len times
-        query = target_feat.repeat(self.pred_len, 1, 1)  # (Tpred, B, E)
+        # Create decoder query tokens for prediction steps
+        query = target_feat.repeat(self.pred_len, 1, 1)  # (pred_len, B, E)
 
-        # Use the fused set as memory for decoder (shape: N, B, E)
+        # Use the fused features as memory for decoder
         memory = H_fused.permute(1, 0, 2)  # (N, B, E)
+        
+        # Create memory key padding mask if needed
+        if agent_mask is not None:
+            memory_key_padding_mask = ~agent_mask  # (B, N)
+        else:
+            memory_key_padding_mask = None
 
-        dec_out = self.transformer_decoder(tgt=query, memory=memory)  # (Tpred, B, E)
-        # take last token representation or pool across time
-        # We'll apply regressor on mean of decoder outputs per sample
+        dec_out = self.transformer_decoder(
+            tgt=query, 
+            memory=memory,
+            memory_key_padding_mask=memory_key_padding_mask
+        )  # (pred_len, B, E)
+        
+        # Apply regressor on mean of decoder outputs per sample
         dec_out_mean = dec_out.permute(1, 0, 2).mean(dim=1)  # (B, E)
 
         reg = self.reg_head(dec_out_mean)  # (B, pred_len*2)

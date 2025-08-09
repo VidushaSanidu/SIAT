@@ -10,7 +10,7 @@ from .utils import ade_fde
 from .training import train_one_epoch, evaluate
 
 __version__ = "1.0.0"
-__author__ = "Generated for SIAT Research"
+__author__ = "Generated for SIAT Research Paper"
 
 __all__ = [
     'SIAT',
