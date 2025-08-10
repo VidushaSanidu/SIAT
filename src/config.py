@@ -2,7 +2,7 @@
 Configuration settings for SIAT model training and evaluation.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -46,9 +46,9 @@ class DataConfig:
 @dataclass
 class Config:
     """Main configuration class combining all config components."""
-    model: ModelConfig = ModelConfig()
-    training: TrainingConfig = TrainingConfig()
-    data: DataConfig = DataConfig()
+    model: ModelConfig = field(default_factory=ModelConfig)
+    training: TrainingConfig = field(default_factory=TrainingConfig)
+    data: DataConfig = field(default_factory=DataConfig)
     
     def __post_init__(self):
         """Ensure consistency between configs."""

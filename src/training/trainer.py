@@ -7,8 +7,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from ..utils.metrics import ade_fde
+from utils.metrics import ade_fde
 
 
 def train_one_epoch(model: nn.Module, 
@@ -32,9 +33,13 @@ def train_one_epoch(model: nn.Module,
     model.train()
     total_loss = 0.0
     
-    for batch in loader:
+    # Create progress bar for training batches
+    pbar = tqdm(loader, desc="Training", leave=False, ncols=80, dynamic_ncols=True)
+    
+    for batch in pbar:
         obs = batch['obs'].to(device)               # (B, obs_len, 2)
-        fut = batch['fut'].to(device)               # (B, pred_len, 2)
+        fut = batch['fut'].to(device)               # (B, pred_len, 2)1
+        
         window = batch['window'].to(device)         # (B, N, obs+pred, 2)
         agent_mask = batch['agent_mask'].to(device) # (B, N)
 
@@ -47,7 +52,11 @@ def train_one_epoch(model: nn.Module,
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
             
         optimizer.step()
-        total_loss += loss.item() * obs.size(0)
+        batch_loss = loss.item()
+        total_loss += batch_loss * obs.size(0)
+        
+        # Update progress bar with current loss
+        pbar.set_postfix({'loss': f'{batch_loss:.6f}'})
         
     return total_loss / len(loader.dataset)
 
@@ -70,8 +79,11 @@ def evaluate(model: nn.Module,
     total_ade = 0.0
     total_fde = 0.0
     
+    # Create progress bar for evaluation batches
+    pbar = tqdm(loader, desc="Evaluating", leave=False, ncols=80, dynamic_ncols=True)
+    
     with torch.no_grad():
-        for batch in loader:
+        for batch in pbar:
             obs = batch['obs'].to(device)
             fut = batch['fut'].to(device)
             window = batch['window'].to(device)
@@ -81,6 +93,9 @@ def evaluate(model: nn.Module,
             ade, fde = ade_fde(pred, fut)
             total_ade += ade * obs.size(0)
             total_fde += fde * obs.size(0)
+            
+            # Update progress bar with current metrics
+            pbar.set_postfix({'ADE': f'{ade:.4f}', 'FDE': f'{fde:.4f}'})
             
     n = len(loader.dataset)
     return total_ade / n, total_fde / n

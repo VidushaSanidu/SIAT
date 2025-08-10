@@ -22,6 +22,7 @@ import torch
 from torch.utils.data import DataLoader, random_split
 import numpy as np
 from pathlib import Path
+from tqdm import tqdm
 
 # Add src to path
 sys.path.append('src')
@@ -90,7 +91,12 @@ def setup_training_args():
 def setup_device(device_arg):
     """Setup training device."""
     if device_arg == 'auto':
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            device = torch.device('mps')
+        else:
+            device = torch.device('cpu')
     else:
         device = torch.device(device_arg)
     
@@ -99,6 +105,11 @@ def setup_device(device_arg):
     if device.type == 'cuda':
         print(f"   GPU: {torch.cuda.get_device_name(0)}")
         print(f"   Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    elif device.type == 'mps':
+        print(f"   GPU: Apple Metal Performance Shaders")
+        print(f"   Apple Silicon: GPU acceleration enabled")
+    elif device.type == 'cpu':
+        print(f"   Using CPU (no GPU acceleration)")
     
     return device
 
@@ -142,13 +153,16 @@ def create_datasets(args):
     print(f"   Validation samples: {len(val_dataset)}")
     
     # Create dataloaders
+    # Pin memory for CUDA, but not for MPS (can cause issues)
+    use_pin_memory = torch.cuda.is_available()
+    
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
         collate_fn=collate_fn,
-        pin_memory=True if torch.cuda.is_available() else False
+        pin_memory=use_pin_memory
     )
     
     val_loader = DataLoader(
@@ -157,7 +171,7 @@ def create_datasets(args):
         shuffle=False,
         num_workers=args.num_workers,
         collate_fn=collate_fn,
-        pin_memory=True if torch.cuda.is_available() else False
+        pin_memory=use_pin_memory
     )
     
     return train_loader, val_loader
@@ -199,8 +213,7 @@ def create_optimizer(model, args):
         optimizer,
         mode='min',
         patience=5,
-        factor=0.5,
-        verbose=True
+        factor=0.5
     )
     
     print(f"   Optimizer: Adam (lr={args.lr}, weight_decay={args.weight_decay})")
@@ -284,7 +297,6 @@ def main():
         best_epoch = start_epoch - 1
     
     # Training setup
-    print(f"\n🏋️  Starting training from epoch {start_epoch}...")
     train_start_time = time.time()
     
     # Training history
@@ -296,7 +308,13 @@ def main():
     patience_counter = 0
     
     # Training loop
-    for epoch in range(start_epoch, args.epochs + 1):
+    print(f"\n🏋️  Starting training from epoch {start_epoch}...")
+    
+    # Create epoch progress bar
+    epoch_range = range(start_epoch, args.epochs + 1)
+    epoch_pbar = tqdm(epoch_range, desc="Training Progress", ncols=100, position=0, dynamic_ncols=True)
+    
+    for epoch in epoch_pbar:
         epoch_start_time = time.time()
         
         # Training
@@ -315,16 +333,26 @@ def main():
         epoch_time = time.time() - epoch_start_time
         elapsed_time = time.time() - train_start_time
         
-        # Logging
+        # Update epoch progress bar
+        current_lr = optimizer.param_groups[0]['lr']
+        epoch_pbar.set_postfix({
+            'Loss': f'{train_loss:.6f}',
+            'ADE': f'{val_ade:.4f}',
+            'FDE': f'{val_fde:.4f}',
+            'LR': f'{current_lr:.1e}',
+            'Time': f'{format_time(epoch_time)}',
+            'Best': f'{best_ade:.4f}'
+        })
+        
+        # Detailed logging every few epochs
         if epoch % args.log_every == 0 or epoch == 1:
-            current_lr = optimizer.param_groups[0]['lr']
-            print(f"Epoch {epoch:3d}/{args.epochs} | "
-                  f"Loss {train_loss:.6f} | "
-                  f"ADE {val_ade:.4f} | "
-                  f"FDE {val_fde:.4f} | "
-                  f"LR {current_lr:.2e} | "
-                  f"Time {format_time(epoch_time)} | "
-                  f"Elapsed {format_time(elapsed_time)}")
+            tqdm.write(f"Epoch {epoch:3d}/{args.epochs} | "
+                      f"Loss {train_loss:.6f} | "
+                      f"ADE {val_ade:.4f} | "
+                      f"FDE {val_fde:.4f} | "
+                      f"LR {current_lr:.2e} | "
+                      f"Time {format_time(epoch_time)} | "
+                      f"Elapsed {format_time(elapsed_time)}")
         
         # Save best model
         if val_ade < best_ade:
@@ -333,7 +361,7 @@ def main():
             patience_counter = 0
             
             best_path = save_checkpoint(model, optimizer, epoch, best_ade, args, "best_model.pth")
-            print(f"💾 New best model saved! ADE: {best_ade:.4f}")
+            tqdm.write(f"💾 New best model saved! ADE: {best_ade:.4f}")
         else:
             patience_counter += 1
         
@@ -343,8 +371,11 @@ def main():
         
         # Early stopping
         if args.early_stop > 0 and patience_counter >= args.early_stop:
-            print(f"\n⏰ Early stopping triggered after {patience_counter} epochs without improvement")
+            tqdm.write(f"\n⏰ Early stopping triggered after {patience_counter} epochs without improvement")
             break
+    
+    # Close the epoch progress bar
+    epoch_pbar.close()
     
     # Training completed
     total_time = time.time() - train_start_time
