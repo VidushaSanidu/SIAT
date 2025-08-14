@@ -10,7 +10,53 @@ SIAT integrates two key components:
 
 The model processes observed trajectories (8 timesteps) to predict future trajectories (12 timesteps) while considering the influence of nearby pedestrians.
 
-## 📁 Project Structure
+## � About the Original Research
+
+This implementation is based on the **Social Interaction-Aware Transformer (SIAT)** architecture for pedestrian trajectory prediction. The original research addresses the challenge of accurately predicting human movement in crowded environments by modeling both temporal patterns and social interactions.
+
+### Key Contributions
+
+The SIAT model introduces several innovative concepts:
+
+- **Hybrid Architecture**: Combines the sequential modeling capabilities of Transformers with the relational modeling of Graph Convolutional Networks
+- **Social Interaction Modeling**: Uses distance-based adjacency matrices to capture pedestrian interactions
+- **Feature Fusion**: Employs learnable weights to optimally combine temporal and social features
+- **End-to-End Learning**: Jointly optimizes both temporal and spatial relationship learning
+
+### Problem Motivation
+
+Traditional trajectory prediction methods often fail to account for the complex social dynamics that influence human movement. People adjust their paths based on:
+- Proximity to others
+- Group behaviors
+- Environmental constraints
+- Social conventions (e.g., avoiding collisions, maintaining personal space)
+
+SIAT addresses these limitations by explicitly modeling social interactions through graph neural networks while maintaining the temporal modeling capabilities of transformer architectures.
+
+### Technical Innovation
+
+- **Dual-Stream Processing**: Separate but interconnected pathways for temporal and social feature extraction
+- **Adaptive Attention**: Transformer attention mechanisms that consider both temporal sequence and social context
+- **Graph-Based Social Modeling**: Dynamic graph construction based on pedestrian proximity for each prediction step
+- **Learnable Feature Fusion**: Trainable parameters that balance temporal vs. social information based on the data
+
+### Research Impact
+
+This work contributes to the broader field of human motion prediction and has applications in:
+- Autonomous vehicle navigation
+- Robot path planning in human environments
+- Crowd simulation and management
+- Human-robot interaction systems
+
+### Performance Characteristics
+
+The model demonstrates improved prediction accuracy compared to baseline methods, particularly in:
+- Dense crowd scenarios
+- Long-term predictions (12+ timesteps)
+- Scenarios with complex social interactions
+- Multi-agent environments
+
+## �📁 Project Structure
 
 ```
 SIAT/
