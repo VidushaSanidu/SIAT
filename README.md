@@ -1,46 +1,45 @@
 # SIAT: Social Interaction-Aware Transformer
 
-A PyTorch implementation of the Social Interaction-Aware Transformer for pedestrian trajectory prediction.
+A PyTorch implementation of the **Social Interaction-Aware Transformer (SIAT)** for pedestrian trajectory prediction. This model combines Transformer encoders/decoders with Graph Convolutional Networks to capture both temporal dependencies and social interactions in multi-agent scenarios.
 
-## Overview
+## 🏗️ Architecture
 
-SIAT combines Transformer encoders/decoders with Graph Convolutional Networks to capture both temporal dependencies and social interactions for accurate pedestrian trajectory prediction.
+SIAT integrates two key components:
+- **Transformer Networks**: Capture temporal dependencies in pedestrian trajectories
+- **Graph Convolutional Networks (GCN)**: Model social interactions between pedestrians based on spatial proximity
 
-## Features
+The model processes observed trajectories (8 timesteps) to predict future trajectories (12 timesteps) while considering the influence of nearby pedestrians.
 
-- **Modular Architecture**: Clean separation of concerns with dedicated modules for models, data, training, and utilities
-- **Configurable**: Easy configuration management through dataclasses
-- **Extensible**: Well-documented code structure for easy extension and modification
-- **Reproducible**: Consistent training and evaluation protocols
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 SIAT/
-├── src/
-│   ├── __init__.py
-│   ├── config.py                 # Configuration management
-│   ├── models/
-│   │   ├── __init__.py
+├── src/                          # Source code
+│   ├── models/                   # Model implementations
 │   │   ├── siat.py              # Main SIAT model
-│   │   └── gcn.py               # Graph Convolutional Network layers
-│   ├── data/
-│   │   ├── __init__.py
-│   │   └── dataset.py           # Dataset classes
-│   ├── training/
-│   │   ├── __init__.py
-│   │   └── trainer.py           # Training and evaluation functions
-│   └── utils/
-│       ├── __init__.py
-│       └── metrics.py           # Evaluation metrics (ADE, FDE)
-├── train.py                     # Main training script
-├── evaluate.py                  # Model evaluation script
-├── requirements.txt             # Python dependencies
-├── setup.py                     # Package installation
-└── README.md                    # This file
+│   │   └── gcn.py               # GCN layer implementation
+│   ├── data/                     # Data loading and preprocessing
+│   ├── training/                 # Training utilities
+│   ├── utils/                    # Evaluation metrics and utilities
+│   └── config.py                # Configuration settings
+├── scripts/                      # Training pipeline scripts
+├── data_npz/                     # Preprocessed trajectory data
+├── datasets/                     # Raw dataset files
+├── checkpoints/                  # Saved model checkpoints
+├── requirements.txt              # Python dependencies
+├── run_pipeline.py              # Master training script
+└── example.py                   # Usage example
 ```
 
-## Installation
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- PyTorch
+- Additional dependencies listed in `requirements.txt`
+
+### Installation
 
 1. Clone the repository:
 ```bash
@@ -53,121 +52,181 @@ cd SIAT
 pip install -r requirements.txt
 ```
 
-3. Install the package in development mode:
+### Usage
+
+#### Option 1: Automated Pipeline (Recommended)
+
+Run the complete training pipeline:
 ```bash
-pip install -e .
+python run_pipeline.py
 ```
 
-## Data Preparation
+This script will automatically:
+1. Check environment setup
+2. Preprocess data
+3. Test model compatibility
+4. Train the model
+5. Evaluate results
 
-The model expects preprocessed data in NumPy `.npz` format. Each file should contain:
+#### Option 2: Manual Steps
 
-- `trajectories`: Array of shape `(N_agents, T_total, 2)` where:
-  - `N_agents`: Number of agents in the scene
-  - `T_total`: Total time steps
-  - `2`: x, y coordinates
-
-### ETH/UCY Dataset
-
-For ETH/UCY datasets, convert track files into `.npz` format with the expected structure. Ensure coordinates are in world coordinates (e.g., meters) and consider per-scene normalization if coordinates vary significantly between scenes.
-
-## Usage
-
-### Training
-
+1. **Preprocess data:**
 ```bash
-python train.py --data_dir ./data_npz --epochs 50 --batch_size 32 --lr 0.001
+python scripts/step2_preprocess_data.py --input_dir ./datasets --output_dir ./data_npz
 ```
 
-### Evaluation
-
+2. **Train the model:**
 ```bash
-python evaluate.py --model_path ./checkpoints/siat_model.pth --data_dir ./data_npz
+python scripts/step4_train_model.py --data_dir ./data_npz --epochs 50 --batch_size 32
 ```
 
-### Programmatic Usage
+3. **Evaluate the model:**
+```bash
+python scripts/step5_evaluate_model.py --checkpoint ./checkpoints/best_model.pth --data_dir ./data_npz
+```
+
+#### Option 3: Basic Example
+
+For a quick demonstration:
+```bash
+python example.py
+```
+
+## 📊 Model Configuration
+
+The model can be configured through `src/config.py`:
+
+```python
+@dataclass
+class ModelConfig:
+    obs_len: int = 8          # Observation length (timesteps)
+    pred_len: int = 12        # Prediction length (timesteps)
+    embed_size: int = 64      # Embedding dimension
+    enc_layers: int = 2       # Transformer encoder layers
+    dec_layers: int = 1       # Transformer decoder layers
+    nhead: int = 4            # Attention heads
+    gcn_hidden: int = 64      # GCN hidden dimension
+    gcn_layers: int = 2       # Number of GCN layers
+    dropout: float = 0.1      # Dropout rate
+```
+
+## 📈 Datasets
+
+The model supports trajectory datasets in NPZ format. The pipeline includes preprocessing scripts for common pedestrian datasets:
+
+- **ETH/UCY datasets**: Standard benchmarks for pedestrian trajectory prediction
+- **Custom datasets**: Any trajectory data can be preprocessed using the provided scripts
+
+### Data Format
+
+Input trajectories should be in NPZ format with:
+- `trajectories`: Array of shape `(n_agents, timesteps, 2)` containing x,y coordinates
+- Preprocessed data includes both observed and future timesteps
+
+## 🧠 Model Details
+
+### Input
+- **obs**: Target pedestrian observations `(batch_size, obs_len, 2)`
+- **full_window**: All agents in scene `(batch_size, n_agents, obs_len+pred_len, 2)`
+- **agent_mask**: Valid agent indicators `(batch_size, n_agents)`
+
+### Output
+- **pred**: Predicted future trajectory `(batch_size, pred_len, 2)`
+
+### Key Features
+- **Transformer Encoder**: Processes agent embeddings to capture temporal patterns
+- **GCN**: Models social interactions via distance-based adjacency matrices
+- **Feature Fusion**: Combines transformer and GCN outputs with learnable weights
+- **Transformer Decoder**: Generates future trajectory predictions
+
+## 📊 Evaluation Metrics
+
+The model is evaluated using standard trajectory prediction metrics:
+- **ADE** (Average Displacement Error): Average L2 distance across all predicted points
+- **FDE** (Final Displacement Error): L2 distance at the final predicted point
+
+## 🔧 Pipeline Options
+
+The `run_pipeline.py` script supports various options:
+
+```bash
+# Run specific step only
+python run_pipeline.py --only-step 4
+
+# Skip a step (useful if already completed)
+python run_pipeline.py --skip-step 1
+
+# Quick test with reduced epochs
+python run_pipeline.py --quick
+```
+
+## 📝 Example Usage
 
 ```python
 import torch
 from src.models import SIAT
-from src.data import TrajectoryDataset
-from src.training import train_one_epoch, evaluate
-
-# Initialize model
-model = SIAT(obs_len=8, pred_len=12, embed_size=64)
-
-# Load data
-dataset = TrajectoryDataset(npz_files, obs_len=8, pred_len=12)
-loader = torch.utils.data.DataLoader(dataset, batch_size=32)
-
-# Train
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-loss = train_one_epoch(model, optimizer, loader, device='cuda')
-
-# Evaluate
-ade, fde = evaluate(model, loader, device='cuda')
-```
-
-## Model Architecture
-
-The SIAT model consists of:
-
-1. **Embedding Layer**: Projects flattened trajectory sequences to embedding space
-2. **Transformer Encoder**: Processes agent embeddings to capture temporal dependencies
-3. **Graph Convolutional Network**: Models social interactions through dynamic adjacency matrices
-4. **Feature Fusion**: Combines transformer and GCN features with learnable weights
-5. **Transformer Decoder**: Generates future trajectory predictions
-6. **Regression Head**: Outputs final coordinate predictions
-
-## Configuration
-
-Model and training parameters can be configured through the `Config` class in `src/config.py`:
-
-```python
 from src.config import Config
 
+# Initialize model
 config = Config()
-config.model.embed_size = 128
-config.training.learning_rate = 0.0005
-config.data.obs_len = 8
+model = SIAT(
+    obs_len=config.model.obs_len,
+    pred_len=config.model.pred_len,
+    embed_size=config.model.embed_size
+)
+
+# Forward pass
+obs = torch.randn(1, 8, 2)          # Observed trajectory
+window = torch.randn(1, 5, 20, 2)   # Full scene window
+pred = model(obs, window)            # Predicted trajectory
 ```
 
-## Evaluation Metrics
+## 🏆 Results
 
-- **ADE (Average Displacement Error)**: Mean Euclidean distance between predicted and ground truth across all timesteps
-- **FDE (Final Displacement Error)**: Euclidean distance between predicted and ground truth final positions
+After training, you'll find:
+- **Model checkpoint**: `./checkpoints/best_model.pth`
+- **Evaluation results**: `./results/evaluation_results.json`
+- **Visualizations**: `./results/` (if enabled)
 
-## Citation
+## 🤝 Contributing
 
-If you use this code in your research, please cite the original SIAT paper:
+This implementation is designed for research purposes. Key areas for contribution:
+- Additional dataset support
+- Alternative attention mechanisms
+- Multi-modal prediction capabilities
+- Performance optimizations
+
+## 📚 Citation
+
+If you use this implementation in your research, please cite the original SIAT paper:
 
 ```bibtex
 @article{siat2023,
-  title={SIAT: Pedestrian trajectory prediction via social interaction-aware transformer},
-  author={[Original Authors]},
-  journal={[Journal Name]},
+  title={Social Interaction-Aware Transformer for Pedestrian Trajectory Prediction},
+  author={[Authors]},
+  journal={[Journal]},
   year={2023}
 }
 ```
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is released under the MIT License. See `LICENSE` file for details.
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## Troubleshooting
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **No .npz files found**: Ensure your data is preprocessed and placed in the correct directory
-2. **CUDA out of memory**: Reduce batch size or model dimensions
-3. **Import errors**: Make sure the package is installed with `pip install -e .`
+1. **CUDA out of memory**: Reduce batch size in config
+2. **Data not found**: Ensure datasets are in the correct directory structure
+3. **Import errors**: Verify all dependencies are installed
 
-For more issues, please check the GitHub issues page or create a new issue.
+### Getting Help
+
+- Check the pipeline logs for detailed error messages
+- Run individual steps to isolate issues
+- Verify data preprocessing completed successfully
+
+---
+
+**Note**: This implementation is for research and educational purposes. Performance may vary depending on dataset and hyperparameter settings.
