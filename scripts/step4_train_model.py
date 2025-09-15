@@ -24,8 +24,10 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-# Add src to path
-sys.path.append('src')
+# Add src and project root to sys.path so we can import modules
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
 
 from models import SIAT
 from data import TrajectoryDataset, collate_fn

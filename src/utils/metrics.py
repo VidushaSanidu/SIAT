@@ -1,7 +1,3 @@
-"""
-Evaluation metrics for trajectory prediction.
-"""
-
 from typing import Tuple
 import torch
 

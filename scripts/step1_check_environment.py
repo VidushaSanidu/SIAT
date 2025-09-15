@@ -8,7 +8,6 @@ Run this first to ensure all dependencies are installed and paths are correct.
 
 import sys
 import os
-import subprocess
 from pathlib import Path
 
 

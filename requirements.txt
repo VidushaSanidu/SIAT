@@ -1,16 +1,9 @@
-# Python dependencies for SIAT project
-numpy
-pandas
+# Core dependencies for SIAT (Social Interaction-Aware Transformer)
 torch
 torchvision
 torchaudio
+numpy
+pandas
 matplotlib
 tqdm
-
-# Video processing
-opencv-python
-ultralytics
-
-# Tracking (for associating detections across frames)
-filterpy
-scikit-learn
+scipy

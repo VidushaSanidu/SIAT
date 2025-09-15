@@ -1,298 +1,208 @@
 # SIAT: Social Interaction-Aware Transformer
 
-A PyTorch implementation of the **Social Interaction-Aware Transformer (SIAT)** for pedestrian trajectory prediction. This model combines Transformer encoders/decoders with Graph Convolutional Networks to capture both temporal dependencies and social interactions in multi-agent scenarios.
+A PyTorch implementation of the **Social Interaction-Aware Transformer (SIAT)** for multi-agent pedestrian trajectory prediction. This model combines Transformer encoders/decoders with Graph Convolutional Networks (GCN) to capture both temporal motion dependencies and spatial/social interactions in crowded scenarios.
+
+This project implements the model proposed in:
+> **Research Paper:**  
+> **Title:** *SIAT: Pedestrian trajectory prediction via social interaction-aware transformer*  
+> **Authors:** Chengdong Wang, Jianming Wang, Wenbo Gao, Lei Guo  
+> **Published in:** *Complex & Intelligent Systems*  
+> **Link:** *https://link.springer.com/article/10.1007/s40747-025-01944-3*
+
+---
 
 ## 🏗️ Architecture
 
-SIAT integrates two key components:
-- **Transformer Networks**: Capture temporal dependencies in pedestrian trajectories
-- **Graph Convolutional Networks (GCN)**: Model social interactions between pedestrians based on spatial proximity
+SIAT integrates two primary processing streams:
+1. **Transformer Encoder-Decoder**: Captures temporal trajectory dynamics and sequential dependencies.
+2. **Pedestrian Social Processing Module (GCN)**: Models social interactions dynamically by building an adjacency graph based on pedestrian spatial proximity (Gaussian kernel) at the observation horizon.
+3. **Feature Fusion**: Combines temporal transformer representations and spatial GCN representations using learned weighting parameters ($\lambda_1, \lambda_2$).
+4. **Regression Head**: Outputs future coordinate predictions across the prediction horizon.
 
-The model processes observed trajectories (8 timesteps) to predict future trajectories (12 timesteps) while considering the influence of nearby pedestrians.
+```
+                  ┌──────────────────────┐
+                  │ Observed & Neighbor  │
+                  │     Trajectories     │
+                  └──────────┬───────────┘
+                             │
+                      Embedding Layer
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+   ┌──────────────────────┐      ┌──────────────────────┐
+   │ Transformer Encoder  │      │ Spatial Graph & GCN  │
+   │  (Temporal Dynamics) │      │ (Social Interaction) │
+   └──────────┬───────────┘      └──────────┬───────────┘
+              │                             │
+              └──────────────┬──────────────┘
+                             ▼
+                    Feature Fusion (λ)
+                             │
+                             ▼
+                    Transformer Decoder
+                             │
+                             ▼
+                    Regression Head
+                             │
+                             ▼
+                  Future Trajectories (x, y)
+```
 
-## � About the Original Research
+- **Observed horizon**: 8 timesteps (default, 3.2s @ 2.5Hz)
+- **Prediction horizon**: 12 timesteps (default, 4.8s @ 2.5Hz)
+- **Target benchmarks**: ETH / UCY datasets (ETH, HOTEL, UNIV, ZARA1, ZARA2)
 
-This implementation is based on the **Social Interaction-Aware Transformer (SIAT)** architecture for pedestrian trajectory prediction. The original research addresses the challenge of accurately predicting human movement in crowded environments by modeling both temporal patterns and social interactions.
+---
 
-### Key Contributions
-
-The SIAT model introduces several innovative concepts:
-
-- **Hybrid Architecture**: Combines the sequential modeling capabilities of Transformers with the relational modeling of Graph Convolutional Networks
-- **Social Interaction Modeling**: Uses distance-based adjacency matrices to capture pedestrian interactions
-- **Feature Fusion**: Employs learnable weights to optimally combine temporal and social features
-- **End-to-End Learning**: Jointly optimizes both temporal and spatial relationship learning
-
-### Problem Motivation
-
-Traditional trajectory prediction methods often fail to account for the complex social dynamics that influence human movement. People adjust their paths based on:
-- Proximity to others
-- Group behaviors
-- Environmental constraints
-- Social conventions (e.g., avoiding collisions, maintaining personal space)
-
-SIAT addresses these limitations by explicitly modeling social interactions through graph neural networks while maintaining the temporal modeling capabilities of transformer architectures.
-
-### Technical Innovation
-
-- **Dual-Stream Processing**: Separate but interconnected pathways for temporal and social feature extraction
-- **Adaptive Attention**: Transformer attention mechanisms that consider both temporal sequence and social context
-- **Graph-Based Social Modeling**: Dynamic graph construction based on pedestrian proximity for each prediction step
-- **Learnable Feature Fusion**: Trainable parameters that balance temporal vs. social information based on the data
-
-### Research Impact
-
-This work contributes to the broader field of human motion prediction and has applications in:
-- Autonomous vehicle navigation
-- Robot path planning in human environments
-- Crowd simulation and management
-- Human-robot interaction systems
-
-### Performance Characteristics
-
-The model demonstrates improved prediction accuracy compared to baseline methods, particularly in:
-- Dense crowd scenarios
-- Long-term predictions (12+ timesteps)
-- Scenarios with complex social interactions
-- Multi-agent environments
-
-## �📁 Project Structure
+## 📁 Repository Structure
 
 ```
 SIAT/
-├── src/                          # Source code
-│   ├── models/                   # Model implementations
-│   │   ├── siat.py              # Main SIAT model
-│   │   └── gcn.py               # GCN layer implementation
-│   ├── data/                     # Data loading and preprocessing
-│   ├── training/                 # Training utilities
-│   ├── utils/                    # Evaluation metrics and utilities
-│   └── config.py                # Configuration settings
-├── scripts/                      # Training pipeline scripts
-├── data_npz/                     # Preprocessed trajectory data
-├── datasets/                     # Raw dataset files
-├── checkpoints/                  # Saved model checkpoints
-├── requirements.txt              # Python dependencies
-├── run_pipeline.py              # Master training script
-└── example.py                   # Usage example
+├── src/
+│   ├── models/
+│   │   ├── siat.py          # SIAT model architecture
+│   │   └── gcn.py           # Graph Convolutional Network layer (used in SIAT)
+│   ├── data/
+│   │   └── dataset.py       # TrajectoryDataset and collate_fn with masking
+│   ├── training/
+│   │   └── trainer.py       # Training loop and evaluation routines
+│   ├── utils/
+│   │   └── metrics.py       # ADE and FDE metrics calculation
+│   └── config.py            # Dataclass configuration settings
+├── scripts/
+│   ├── step0_download_data.sh       # Script to download ETH/UCY datasets
+│   ├── step1_check_environment.py   # Verify Python & PyTorch dependencies
+│   ├── step2_preprocess_data.py     # Preprocess raw ETH/UCY txt files to .npz
+│   ├── step3_test_compatibility.py  # Test model forward & backward passes
+│   ├── step4_train_model.py         # Advanced training script with logging
+│   └── step5_evaluate_model.py      # Evaluate checkpoints on ADE/FDE
+├── train.py                 # Main root training entry point
+├── SIAT_colab.ipynb         # Google Colab notebook for GPU training
+├── requirements.txt         # Core Python dependencies
+└── README.md
 ```
 
-## 🚀 Quick Start
+---
 
-### Prerequisites
+## 🚀 Getting Started
 
-- Python 3.8+
-- PyTorch
-- Additional dependencies listed in `requirements.txt`
+### 1. Installation
 
-### Installation
+Create a virtual environment and install the required dependencies:
 
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd SIAT
-```
-
-2. Install dependencies:
-```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### ⚡ Processing Video Data (NEW!)
+### 2. Dataset Preparation
 
-Extract pedestrian trajectories from your own videos (.avi, .mp4, etc.):
+Download the standard ETH/UCY benchmark datasets and convert them into model-ready `.npz` sliding windows:
 
 ```bash
-# Process videos with YOLO detection and trajectory extraction
-python scripts/step0_process_videos.py \
-    --video_dir ./videos \
-    --output_dir ./data_npz \
-    --model yolov8n.pt
-```
+# Step 0: Download raw ETH/UCY datasets
+bash scripts/step0_download_data.sh
 
-This will:
-1. 🎥 Read video frames
-2. 🔍 Detect pedestrians using YOLOv8
-3. 📍 Track pedestrians across frames
-4. 📊 Create training data in model-ready format
-
-**See [QUICK_START.md](QUICK_START.md) and [VIDEO_PROCESSING.md](VIDEO_PROCESSING.md) for detailed instructions!**
-
-### Usage
-
-#### Option 1: Automated Pipeline (Recommended)
-
-Run the complete training pipeline:
-```bash
-python run_pipeline.py
-```
-
-This script will automatically:
-1. Check environment setup
-2. Preprocess data
-3. Test model compatibility
-4. Train the model
-5. Evaluate results
-
-#### Option 2: Manual Steps
-
-1. **Preprocess data:**
-```bash
+# Step 2: Preprocess trajectories into .npz files
 python scripts/step2_preprocess_data.py --input_dir ./datasets --output_dir ./data_npz
 ```
 
-2. **Train the model:**
+### 3. Model Compatibility Test
+
+Verify that the model architecture and data loaders run smoothly:
+
+```bash
+python scripts/step3_test_compatibility.py
+```
+
+---
+
+## 🏋️ Training
+
+### Quick Training
+Run standard training with default hyperparameters:
+
+```bash
+python train.py --data_dir ./data_npz --epochs 50 --batch_size 32
+```
+
+### Advanced Training Options
+You can configure model capacity and training settings via CLI flags:
+
+```bash
+python train.py \
+    --data_dir ./data_npz \
+    --epochs 60 \
+    --batch_size 32 \
+    --lr 0.001 \
+    --embed_size 64 \
+    --enc_layers 2 \
+    --dec_layers 1 \
+    --nhead 4 \
+    --gcn_hidden 64 \
+    --gcn_layers 2 \
+    --device auto \
+    --checkpoint_dir ./checkpoints
+```
+
+Alternatively, use the modular training script:
+
 ```bash
 python scripts/step4_train_model.py --data_dir ./data_npz --epochs 50 --batch_size 32
 ```
 
-3. **Evaluate the model:**
-```bash
-python scripts/step5_evaluate_model.py --checkpoint ./checkpoints/best_model.pth --data_dir ./data_npz
-```
+---
 
-#### Option 3: Basic Example
+## 📊 Evaluation
 
-For a quick demonstration:
-```bash
-python example.py
-```
-
-## 📊 Model Configuration
-
-The model can be configured through `src/config.py`:
-
-```python
-@dataclass
-class ModelConfig:
-    obs_len: int = 8          # Observation length (timesteps)
-    pred_len: int = 12        # Prediction length (timesteps)
-    embed_size: int = 64      # Embedding dimension
-    enc_layers: int = 2       # Transformer encoder layers
-    dec_layers: int = 1       # Transformer decoder layers
-    nhead: int = 4            # Attention heads
-    gcn_hidden: int = 64      # GCN hidden dimension
-    gcn_layers: int = 2       # Number of GCN layers
-    dropout: float = 0.1      # Dropout rate
-```
-
-## 📈 Datasets
-
-The model supports trajectory datasets in NPZ format. The pipeline includes preprocessing scripts for common pedestrian datasets:
-
-- **ETH/UCY datasets**: Standard benchmarks for pedestrian trajectory prediction
-- **Custom datasets**: Any trajectory data can be preprocessed using the provided scripts
-
-### Data Format
-
-Input trajectories should be in NPZ format with:
-- `trajectories`: Array of shape `(n_agents, timesteps, 2)` containing x,y coordinates
-- Preprocessed data includes both observed and future timesteps
-
-## 🧠 Model Details
-
-### Input
-- **obs**: Target pedestrian observations `(batch_size, obs_len, 2)`
-- **full_window**: All agents in scene `(batch_size, n_agents, obs_len+pred_len, 2)`
-- **agent_mask**: Valid agent indicators `(batch_size, n_agents)`
-
-### Output
-- **pred**: Predicted future trajectory `(batch_size, pred_len, 2)`
-
-### Key Features
-- **Transformer Encoder**: Processes agent embeddings to capture temporal patterns
-- **GCN**: Models social interactions via distance-based adjacency matrices
-- **Feature Fusion**: Combines transformer and GCN outputs with learnable weights
-- **Transformer Decoder**: Generates future trajectory predictions
-
-## 📊 Evaluation Metrics
-
-The model is evaluated using standard trajectory prediction metrics:
-- **ADE** (Average Displacement Error): Average L2 distance across all predicted points
-- **FDE** (Final Displacement Error): L2 distance at the final predicted point
-
-## 🔧 Pipeline Options
-
-The `run_pipeline.py` script supports various options:
+Evaluate a saved checkpoint against the test dataset to compute Average Displacement Error (**ADE**) and Final Displacement Error (**FDE**):
 
 ```bash
-# Run specific step only
-python run_pipeline.py --only-step 4
-
-# Skip a step (useful if already completed)
-python run_pipeline.py --skip-step 1
-
-# Quick test with reduced epochs
-python run_pipeline.py --quick
+python scripts/step5_evaluate_model.py \
+    --checkpoint ./checkpoints/best_model.pth \
+    --data_dir ./data_npz
 ```
 
-## 📝 Example Usage
+---
+
+## 💡 Python Usage Example
 
 ```python
 import torch
 from src.models import SIAT
-from src.config import Config
+
+# Dimensions: batch_size=4, num_agents=5, obs_len=8, pred_len=12
+obs_len, pred_len = 8, 12
+B, N = 4, 5
 
 # Initialize model
-config = Config()
-model = SIAT(
-    obs_len=config.model.obs_len,
-    pred_len=config.model.pred_len,
-    embed_size=config.model.embed_size
-)
+model = SIAT(obs_len=obs_len, pred_len=pred_len, embed_size=64)
+model.eval()
+
+# Inputs
+target_obs = torch.randn(B, obs_len, 2)              # (B, 8, 2)
+scene_window = torch.randn(B, N, obs_len+pred_len, 2) # (B, N, 20, 2)
+agent_mask = torch.ones(B, N, dtype=torch.bool)       # (B, N)
 
 # Forward pass
-obs = torch.randn(1, 8, 2)          # Observed trajectory
-window = torch.randn(1, 5, 20, 2)   # Full scene window
-pred = model(obs, window)            # Predicted trajectory
+with torch.no_grad():
+    predicted_fut = model(target_obs, scene_window, agent_mask)
+
+print("Predicted future shape:", predicted_fut.shape)  # torch.Size([4, 12, 2])
 ```
-
-## 🏆 Results
-
-After training, you'll find:
-- **Model checkpoint**: `./checkpoints/best_model.pth`
-- **Evaluation results**: `./results/evaluation_results.json`
-- **Visualizations**: `./results/` (if enabled)
-
-## 🤝 Contributing
-
-This implementation is designed for research purposes. Key areas for contribution:
-- Additional dataset support
-- Alternative attention mechanisms
-- Multi-modal prediction capabilities
-- Performance optimizations
-
-## 📚 Citation
-
-If you use this implementation in your research, please cite the original SIAT paper:
-
-```bibtex
-@article{siat2023,
-  title={Social Interaction-Aware Transformer for Pedestrian Trajectory Prediction},
-  author={[Authors]},
-  journal={[Journal]},
-  year={2023}
-}
-```
-
-## 📄 License
-
-This project is released under the MIT License. See `LICENSE` file for details.
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-1. **CUDA out of memory**: Reduce batch size in config
-2. **Data not found**: Ensure datasets are in the correct directory structure
-3. **Import errors**: Verify all dependencies are installed
-
-### Getting Help
-
-- Check the pipeline logs for detailed error messages
-- Run individual steps to isolate issues
-- Verify data preprocessing completed successfully
 
 ---
 
-**Note**: This implementation is for research and educational purposes. Performance may vary depending on dataset and hyperparameter settings.
+## ☁️ Google Colab
+
+To train on Google Colab with GPU acceleration, open `SIAT_colab.ipynb`. The notebook includes end-to-end data setup, model training, and evaluation cells.
+
+---
+
+## 📜 Metrics
+
+- **ADE (Average Displacement Error)**: Mean Euclidean distance over all predicted timesteps between predicted trajectory and ground truth:
+  $$\text{ADE} = \frac{1}{T_{pred}} \sum_{t=1}^{T_{pred}} \| \hat{Y}_t - Y_t \|_2$$
+- **FDE (Final Displacement Error)**: Euclidean distance at the destination / final predicted timestep:
+  $$\text{FDE} = \| \hat{Y}_{T_{pred}} - Y_{T_{pred}} \|_2$$

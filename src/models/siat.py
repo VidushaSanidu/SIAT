@@ -1,5 +1,5 @@
 """
-SIAT: Social Interaction-Aware Transformer model implementation.
+SIAT: Social Interaction-Aware Transformer model.
 """
 
 import torch
@@ -9,12 +9,6 @@ from .gcn import GCNLayer
 
 
 class SIAT(nn.Module):
-    """
-    Social Interaction-Aware Transformer for pedestrian trajectory prediction.
-    
-    This model combines Transformer encoders/decoders with Graph Convolutional Networks
-    to capture both temporal dependencies and social interactions.
-    """
 
     def __init__(self,
                  obs_len: int = 8,

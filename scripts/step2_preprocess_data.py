@@ -13,9 +13,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 import argparse
-from pathlib import Path
 
 
 def load_eth_ucy_file(file_path):

@@ -1,5 +1,35 @@
-.venv
+# Environment & Virtual Environments
+venv/
+.venv/
+env/
 
-# dataset files
-datasets
-data_npz
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Dataset files & directories
+datasets/
+data_npz/
+*.npz
+*.zip
+
+# Model checkpoints & outputs
+checkpoints/*.pth
+results/
+logs/
+
+# IDE files
+.idea/
+*.swp
+*.swo
