@@ -98,6 +98,26 @@ cd SIAT
 pip install -r requirements.txt
 ```
 
+### ⚡ Processing Video Data (NEW!)
+
+Extract pedestrian trajectories from your own videos (.avi, .mp4, etc.):
+
+```bash
+# Process videos with YOLO detection and trajectory extraction
+python scripts/step0_process_videos.py \
+    --video_dir ./videos \
+    --output_dir ./data_npz \
+    --model yolov8n.pt
+```
+
+This will:
+1. 🎥 Read video frames
+2. 🔍 Detect pedestrians using YOLOv8
+3. 📍 Track pedestrians across frames
+4. 📊 Create training data in model-ready format
+
+**See [QUICK_START.md](QUICK_START.md) and [VIDEO_PROCESSING.md](VIDEO_PROCESSING.md) for detailed instructions!**
+
 ### Usage
 
 #### Option 1: Automated Pipeline (Recommended)

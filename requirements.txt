@@ -6,3 +6,11 @@ torchvision
 torchaudio
 matplotlib
 tqdm
+
+# Video processing
+opencv-python
+ultralytics
+
+# Tracking (for associating detections across frames)
+filterpy
+scikit-learn
