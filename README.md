@@ -9,7 +9,11 @@ This project implements the model proposed in:
 > **Published in:** *Complex & Intelligent Systems*  
 > **Link:** *https://link.springer.com/article/10.1007/s40747-025-01944-3*
 
+*The implementation aims to reproduce the methodology described in the original paper as closely as possible. Since the original source code was not publicly available, certain implementation details not explicitly specified in the paper were necessarily inferred or selected based on the authors' descriptions.*
+
 ---
+
+
 
 ## 🏗️ Architecture
 
